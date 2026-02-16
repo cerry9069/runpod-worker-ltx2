@@ -6,10 +6,11 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
     runpod \
-    ltx-pipelines \
+    diffusers \
     transformers \
     accelerate \
     safetensors \
+    sentencepiece \
     pillow \
     requests \
     imageio[ffmpeg] \

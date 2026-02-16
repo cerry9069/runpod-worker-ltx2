@@ -1,7 +1,6 @@
 """
-RunPod Serverless Handler — LTX-2 Video Generation
-Uses the official ltx-pipelines package from Lightricks.
-Supports both text-to-video and image-to-video.
+RunPod Serverless Handler — LTX Video Generation
+Uses diffusers LTXPipeline for text-to-video and image-to-video.
 """
 import os
 import runpod
@@ -13,27 +12,39 @@ from io import BytesIO
 from PIL import Image
 
 PIPE = None
-CACHE_DIR = "/cache/ltx2"
+I2V_PIPE = None
+CACHE_DIR = "/cache/ltx"
 
 
-def load_pipeline():
-    global PIPE
-    if PIPE is not None:
-        return PIPE
+def load_pipeline(mode="t2v"):
+    global PIPE, I2V_PIPE
 
     os.makedirs(CACHE_DIR, exist_ok=True)
-    print("[ltx2] Loading LTX-2 pipeline...")
 
-    from ltx_pipelines import LTXVideoPipeline
-
-    PIPE = LTXVideoPipeline.from_pretrained(
-        "Lightricks/LTX-2",
-        torch_dtype=torch.bfloat16,
-        cache_dir=CACHE_DIR,
-    ).to("cuda")
-
-    print("[ltx2] Pipeline loaded.")
-    return PIPE
+    if mode == "i2v":
+        if I2V_PIPE is not None:
+            return I2V_PIPE
+        print("[ltx] Loading LTX Image-to-Video pipeline...")
+        from diffusers import LTXImageToVideoPipeline
+        I2V_PIPE = LTXImageToVideoPipeline.from_pretrained(
+            "Lightricks/LTX-Video",
+            torch_dtype=torch.bfloat16,
+            cache_dir=CACHE_DIR,
+        ).to("cuda")
+        print("[ltx] I2V pipeline loaded.")
+        return I2V_PIPE
+    else:
+        if PIPE is not None:
+            return PIPE
+        print("[ltx] Loading LTX Text-to-Video pipeline...")
+        from diffusers import LTXPipeline
+        PIPE = LTXPipeline.from_pretrained(
+            "Lightricks/LTX-Video",
+            torch_dtype=torch.bfloat16,
+            cache_dir=CACHE_DIR,
+        ).to("cuda")
+        print("[ltx] T2V pipeline loaded.")
+        return PIPE
 
 
 def download_image(url):
@@ -54,11 +65,9 @@ def handler(event):
     width = inp.get("width", 768)
     height = inp.get("height", 512)
     fps = inp.get("fps", 24)
-    num_frames = min(fps * duration, 257)  # LTX-2 max ~257 frames
+    num_frames = min(fps * duration, 161)
 
     try:
-        pipe = load_pipeline()
-
         kwargs = {
             "prompt": prompt,
             "negative_prompt": inp.get("negative_prompt", ""),
@@ -70,9 +79,12 @@ def handler(event):
         }
 
         if image_url:
+            pipe = load_pipeline("i2v")
             image = download_image(image_url)
             image = image.resize((width, height))
             kwargs["image"] = image
+        else:
+            pipe = load_pipeline("t2v")
 
         output = pipe(**kwargs)
         frames = output.frames[0]
