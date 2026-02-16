@@ -1,0 +1,11 @@
+{
+  "title": "LTX-2 Video Generator",
+  "description": "RunPod serverless worker for LTX-2 text-to-video and image-to-video generation. Returns video as base64 MP4.",
+  "type": "serverless",
+  "category": "video",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 30,
+    "env": []
+  }
+}

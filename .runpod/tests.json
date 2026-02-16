@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "generate_video_t2v",
+      "input": {
+        "prompt": "A person walking through a sunlit park, cinematic quality",
+        "duration": 3,
+        "width": 768,
+        "height": 512,
+        "fps": 24,
+        "steps": 20
+      },
+      "timeout": 600000
+    }
+  ],
+  "config": {
+    "gpuTypeId": "NVIDIA A40",
+    "gpuCount": 1,
+    "allowedCudaVersions": ["12.7", "12.6", "12.5", "12.4", "12.3", "12.2", "12.1", "12.0", "11.8"]
+  }
+}
