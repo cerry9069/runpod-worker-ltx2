@@ -13,13 +13,29 @@ from PIL import Image
 
 PIPE = None
 I2V_PIPE = None
-CACHE_DIR = "/cache/ltx-v2"
+CACHE_DIR = "/cache/ltx-v3"
+
+
+def clear_corrupt_cache():
+    """Check for corrupt spiece.model files and clear cache if found."""
+    import shutil
+    for root, dirs, files in os.walk(CACHE_DIR):
+        for f in files:
+            if f == "spiece.model":
+                path = os.path.join(root, f)
+                size = os.path.getsize(path)
+                if size < 10000:  # Real file is ~792KB; corrupt/LFS pointer is tiny
+                    print(f"[ltx] WARNING: spiece.model is only {size} bytes, likely corrupt. Clearing cache.")
+                    shutil.rmtree(CACHE_DIR, ignore_errors=True)
+                    os.makedirs(CACHE_DIR, exist_ok=True)
+                    return
 
 
 def load_pipeline(mode="t2v"):
     global PIPE, I2V_PIPE
 
     os.makedirs(CACHE_DIR, exist_ok=True)
+    clear_corrupt_cache()
 
     if mode == "i2v":
         if I2V_PIPE is not None:
