@@ -13,7 +13,7 @@ from PIL import Image
 
 PIPE = None
 I2V_PIPE = None
-CACHE_DIR = "/cache/ltx"
+CACHE_DIR = "/cache/ltx-v2"
 
 
 def load_pipeline(mode="t2v"):
