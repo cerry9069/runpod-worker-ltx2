@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir \
     accelerate \
     safetensors \
     sentencepiece \
+    tiktoken \
     pillow \
     requests \
     imageio[ffmpeg] \
