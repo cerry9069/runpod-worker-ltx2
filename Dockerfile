@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
     runpod \
-    "git+https://github.com/huggingface/diffusers.git" \
+    "diffusers>=0.35.0" \
     "transformers>=4.48.0" \
     accelerate \
     safetensors \
