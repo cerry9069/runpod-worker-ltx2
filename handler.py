@@ -47,9 +47,8 @@ def load_pipeline(mode="t2v"):
             MODEL_ID,
             torch_dtype=torch.bfloat16,
             cache_dir=CACHE_DIR,
-        )
-        I2V_PIPE.enable_model_cpu_offload()
-        print("[ltx] I2V pipeline loaded (cpu_offload).")
+        ).to("cuda")
+        print("[ltx] I2V pipeline loaded.")
         return I2V_PIPE
     else:
         if PIPE is not None:
@@ -60,9 +59,8 @@ def load_pipeline(mode="t2v"):
             MODEL_ID,
             torch_dtype=torch.bfloat16,
             cache_dir=CACHE_DIR,
-        )
-        PIPE.enable_model_cpu_offload()
-        print("[ltx] T2V pipeline loaded (cpu_offload).")
+        ).to("cuda")
+        print("[ltx] T2V pipeline loaded.")
         return PIPE
 
 
@@ -89,12 +87,12 @@ def handler(event):
     try:
         kwargs = {
             "prompt": prompt,
-            "negative_prompt": inp.get("negative_prompt", ""),
+            "negative_prompt": inp.get("negative_prompt", "worst quality, inconsistent motion, blurry, jittery, distorted"),
             "num_frames": num_frames,
             "width": width,
             "height": height,
             "num_inference_steps": inp.get("steps", 50),
-            "guidance_scale": inp.get("guidance_scale", 3.0),
+            "guidance_scale": inp.get("guidance_scale", 7.5),
             "max_sequence_length": inp.get("max_sequence_length", 256),
         }
 
