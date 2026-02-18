@@ -13,7 +13,8 @@ from PIL import Image
 
 PIPE = None
 I2V_PIPE = None
-CACHE_DIR = "/cache/ltx-v3"
+CACHE_DIR = "/cache/ltx-v091"
+MODEL_ID = "Lightricks/LTX-Video-0.9.1"
 
 
 def clear_corrupt_cache():
@@ -40,26 +41,28 @@ def load_pipeline(mode="t2v"):
     if mode == "i2v":
         if I2V_PIPE is not None:
             return I2V_PIPE
-        print("[ltx] Loading LTX Image-to-Video pipeline...")
+        print(f"[ltx] Loading LTX Image-to-Video pipeline from {MODEL_ID}...")
         from diffusers import LTXImageToVideoPipeline
         I2V_PIPE = LTXImageToVideoPipeline.from_pretrained(
-            "Lightricks/LTX-Video",
+            MODEL_ID,
             torch_dtype=torch.bfloat16,
             cache_dir=CACHE_DIR,
-        ).to("cuda")
-        print("[ltx] I2V pipeline loaded.")
+        )
+        I2V_PIPE.enable_model_cpu_offload()
+        print("[ltx] I2V pipeline loaded (cpu_offload).")
         return I2V_PIPE
     else:
         if PIPE is not None:
             return PIPE
-        print("[ltx] Loading LTX Text-to-Video pipeline...")
+        print(f"[ltx] Loading LTX Text-to-Video pipeline from {MODEL_ID}...")
         from diffusers import LTXPipeline
         PIPE = LTXPipeline.from_pretrained(
-            "Lightricks/LTX-Video",
+            MODEL_ID,
             torch_dtype=torch.bfloat16,
             cache_dir=CACHE_DIR,
-        ).to("cuda")
-        print("[ltx] T2V pipeline loaded.")
+        )
+        PIPE.enable_model_cpu_offload()
+        print("[ltx] T2V pipeline loaded (cpu_offload).")
         return PIPE
 
 
@@ -81,7 +84,7 @@ def handler(event):
     width = inp.get("width", 768)
     height = inp.get("height", 512)
     fps = inp.get("fps", 24)
-    num_frames = min(fps * duration, 161)
+    num_frames = min(fps * duration, 97)  # Cap at 97 frames for VRAM safety
 
     try:
         kwargs = {
@@ -90,8 +93,9 @@ def handler(event):
             "num_frames": num_frames,
             "width": width,
             "height": height,
-            "num_inference_steps": inp.get("steps", 30),
-            "guidance_scale": inp.get("guidance_scale", 7.0),
+            "num_inference_steps": inp.get("steps", 50),
+            "guidance_scale": inp.get("guidance_scale", 3.0),
+            "max_sequence_length": inp.get("max_sequence_length", 256),
         }
 
         if image_url:
