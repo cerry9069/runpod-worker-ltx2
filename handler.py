@@ -1,6 +1,11 @@
 """
-RunPod Serverless Handler — LTX Video Generation
-Uses diffusers LTXPipeline for text-to-video and image-to-video.
+RunPod Serverless Handler — LTX Video Generation (v0.9.5)
+Uses diffusers LTXConditionPipeline for text-to-video and image-to-video.
+
+LTXConditionPipeline properly handles image conditioning with noise injection
+(image_cond_noise_scale), which is critical for generating motion in I2V.
+The older LTXImageToVideoPipeline has a known bug where it produces static
+images due to missing noise on the first-frame latent.
 """
 import os
 import runpod
@@ -12,9 +17,8 @@ from io import BytesIO
 from PIL import Image
 
 PIPE = None
-I2V_PIPE = None
-CACHE_DIR = "/cache/ltx-v091"
-MODEL_ID = "Lightricks/LTX-Video-0.9.1"
+CACHE_DIR = "/cache/ltx-v095"
+MODEL_ID = "Lightricks/LTX-Video-0.9.5"
 
 
 def clear_corrupt_cache():
@@ -32,36 +36,25 @@ def clear_corrupt_cache():
                     return
 
 
-def load_pipeline(mode="t2v"):
-    global PIPE, I2V_PIPE
+def load_pipeline():
+    global PIPE
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     clear_corrupt_cache()
 
-    if mode == "i2v":
-        if I2V_PIPE is not None:
-            return I2V_PIPE
-        print(f"[ltx] Loading LTX Image-to-Video pipeline from {MODEL_ID}...")
-        from diffusers import LTXImageToVideoPipeline
-        I2V_PIPE = LTXImageToVideoPipeline.from_pretrained(
-            MODEL_ID,
-            torch_dtype=torch.bfloat16,
-            cache_dir=CACHE_DIR,
-        ).to("cuda")
-        print("[ltx] I2V pipeline loaded.")
-        return I2V_PIPE
-    else:
-        if PIPE is not None:
-            return PIPE
-        print(f"[ltx] Loading LTX Text-to-Video pipeline from {MODEL_ID}...")
-        from diffusers import LTXPipeline
-        PIPE = LTXPipeline.from_pretrained(
-            MODEL_ID,
-            torch_dtype=torch.bfloat16,
-            cache_dir=CACHE_DIR,
-        ).to("cuda")
-        print("[ltx] T2V pipeline loaded.")
+    if PIPE is not None:
         return PIPE
+
+    print(f"[ltx] Loading LTXConditionPipeline from {MODEL_ID}...")
+    from diffusers import LTXConditionPipeline
+    PIPE = LTXConditionPipeline.from_pretrained(
+        MODEL_ID,
+        torch_dtype=torch.bfloat16,
+        cache_dir=CACHE_DIR,
+    ).to("cuda")
+    PIPE.vae.enable_tiling()
+    print("[ltx] Pipeline loaded.")
+    return PIPE
 
 
 def download_image(url):
@@ -85,24 +78,29 @@ def handler(event):
     num_frames = min(fps * duration, 97)  # Cap at 97 frames for VRAM safety
 
     try:
+        pipe = load_pipeline()
+
         kwargs = {
             "prompt": prompt,
             "negative_prompt": inp.get("negative_prompt", "worst quality, inconsistent motion, blurry, jittery, distorted"),
             "num_frames": num_frames,
             "width": width,
             "height": height,
-            "num_inference_steps": inp.get("steps", 50),
-            "guidance_scale": inp.get("guidance_scale", 7.5),
+            "num_inference_steps": inp.get("steps", 40),
+            "guidance_scale": inp.get("guidance_scale", 3.0),
+            "decode_timestep": 0.05,
+            "decode_noise_scale": 0.025,
             "max_sequence_length": inp.get("max_sequence_length", 256),
         }
 
         if image_url:
-            pipe = load_pipeline("i2v")
+            from diffusers.pipelines.ltx.pipeline_ltx_condition import LTXVideoCondition
             image = download_image(image_url)
             image = image.resize((width, height))
-            kwargs["image"] = image
-        else:
-            pipe = load_pipeline("t2v")
+            condition = LTXVideoCondition(image=image, frame_index=0)
+            kwargs["conditions"] = [condition]
+            # Noise injected into conditioning latents — critical for motion generation
+            kwargs["image_cond_noise_scale"] = inp.get("image_cond_noise_scale", 0.15)
 
         output = pipe(**kwargs)
         frames = output.frames[0]
